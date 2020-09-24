@@ -39,7 +39,8 @@ func (s *Service) RegisterBatch(amount int) (*domain_models.DevEUIBatch, error) 
 
 		// register a DevEUI asynchronously
 		go func(i int, devEUI *domain_models.DevEUI, devEUIs *domain_models.DevEUIBatch, wg *sync.WaitGroup) {
-			s.registerDevEUIRoutines(i, devEUI, devEUIs, wg)
+			defer wg.Done()
+			s.registerDevEUI(i, devEUI, devEUIs, 0)
 			<- routineStop // signals the go routine has ended. If the max was reached a new routine can start now
 		}(i, devEUI, devEUIs, wg)
 	}
@@ -49,23 +50,16 @@ func (s *Service) RegisterBatch(amount int) (*domain_models.DevEUIBatch, error) 
 	return devEUIs, nil
 }
 
-func (s *Service) registerDevEUIRoutines(skipIndex int, inputEUI *domain_models.DevEUI, batch *domain_models.DevEUIBatch, wg *sync.WaitGroup) (*domain_models.DevEUI, error) {
-	defer wg.Done()
-	s.registerDevEUI(skipIndex, inputEUI, batch, 0)
-	return nil, nil
-}
-
 func (s *Service) registerDevEUI(skipIndex int, inputEUI *domain_models.DevEUI, batch *domain_models.DevEUIBatch, numberOfTries int) {
 	var err error
 	numberOfTries++
 
 	if numberOfTries > 50 {
-		panic(fmt.Sprintf("#%d of the batch has been retried 10 times. Something is wrong", skipIndex))
+		panic(fmt.Sprintf("#%d of the batch has been retried 50 times. Something is wrong", skipIndex))
 	}
 
 	// Register the DevEUI at the LoraWan provider
-	batch.Batch[skipIndex], err = s.Client.RegisterDevEUI(inputEUI)
-
+	_, err = s.Client.RegisterDevEUI(inputEUI)
 	if err == client_models.ErrDevEUIAlreadyExists { // If we get a EUI already exists error, create a new DevEUI with a unique short code and try again
 		// Lock the batch so we are sure this new record will be unique
 		batch.Lock.Lock()
