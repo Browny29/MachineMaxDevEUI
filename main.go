@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"machine_max_deveui_generator/deveui_service"
 	"os"
@@ -15,6 +16,10 @@ func main() {
 
 	setupCloseHandler(processDone)
 	createBatch(amount, processDone)
+
+	print("Press enter to quit...")
+	reader := bufio.NewReader(os.Stdin)
+	reader.ReadString('\n')
 }
 
 func setupCloseHandler(processDone chan bool) {
