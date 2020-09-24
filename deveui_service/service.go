@@ -52,8 +52,8 @@ func (s *Service) registerDevEUI(skipIndex int, inputEUI *domain_models.DevEUI, 
 	outputEUI, err := s.Client.RegisterDevEUI(inputEUI)
 	if err == client_models.ErrDevEUIAlreadyExists {
 		batch.Lock.Lock()
-		defer batch.Lock.Unlock()
 		inputEUI = domain_models.GenerateUniqueShortCode(skipIndex, inputEUI, batch)
+		batch.Lock.Unlock()
 		return s.registerDevEUI(skipIndex, inputEUI, batch)
 	}
 	if err != nil {

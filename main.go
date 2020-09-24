@@ -1,0 +1,1 @@
+package machine_max_deveui_generator
