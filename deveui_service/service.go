@@ -23,35 +23,30 @@ func NewDefaultService() *Service {
 	}
 }
 
-func (s *Service) RegisterBatch(amount int) ([]domain_models.DevEUI, error) {
-	devEUISlice := domain_models.GenerateBatchWithUniqueShortCodes(amount)
+func (s *Service) RegisterBatch(amount int) (*domain_models.DevEUIBatch, error) {
+	devEUIs := domain_models.GenerateBatchWithUniqueShortCodes(amount)
 
-	wg := sync.WaitGroup{}
-	for i, devEUI := range devEUISlice {
+	wg := &sync.WaitGroup{}
+	for i, devEUI := range devEUIs.Batch {
 		wg.Add(1)
-
-		go func() error{
-			defer wg.Done()
-			outputDevEUI, err := s.registerUniqueDevEUI(i, devEUI, devEUISlice)
-			if err != nil {
-				return err
-			}
-			devEUISlice[i] = *outputDevEUI
-
-			return nil
-		} ()
+		go s.registerDevEUIRoutines(i, devEUI, devEUIs, wg)
 	}
 
 	wg.Wait()
 
-	return devEUISlice, nil
+	return devEUIs, nil
 }
 
-func (s *Service) registerUniqueDevEUI(skipIndex int, inputEUI domain_models.DevEUI, devEUIs []domain_models.DevEUI) (*domain_models.DevEUI, error) {
-	outputEUI, err := s.Client.RegisterDevEUI(&inputEUI)
+func (s *Service) registerDevEUIRoutines(skipIndex int, inputEUI *domain_models.DevEUI, batch *domain_models.DevEUIBatch, wg *sync.WaitGroup) (*domain_models.DevEUI, error) {
+	defer wg.Done()
+	return s.registerDevEUI(skipIndex, inputEUI, batch)
+}
+
+func (s *Service) registerDevEUI(skipIndex int, inputEUI *domain_models.DevEUI, batch *domain_models.DevEUIBatch) (*domain_models.DevEUI, error) {
+	outputEUI, err := s.Client.RegisterDevEUI(inputEUI)
 	if err == client_models.ErrDevEUIAlreadyExists {
-		inputEUI = domain_models.GenerateUniqueShortCode(skipIndex, inputEUI, devEUIs)
-		return s.registerUniqueDevEUI(skipIndex, inputEUI, devEUIs)
+		inputEUI = domain_models.GenerateUniqueShortCode(skipIndex, inputEUI, batch)
+		return s.registerDevEUI(skipIndex, inputEUI, batch)
 	}
 	if err != nil {
 		return nil, err

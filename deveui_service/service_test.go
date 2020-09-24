@@ -21,15 +21,15 @@ func TestService_RegisterBatch_Mocked(t *testing.T) {
 
 	result, err := s.RegisterBatch(amount)
 	assert.NoError(t, err)
-	assert.Equal(t, amount, len(result))
+	assert.Equal(t, amount, len(result.Batch))
 }
 
 func TestService_RegisterBatch(t *testing.T) {
-	const amount = 3
+	const amount = 10
 
 	s := NewDefaultService()
 
 	result, err := s.RegisterBatch(amount)
 	assert.NoError(t, err)
-	assert.Equal(t, amount, len(result))
+	assert.Equal(t, amount, len(result.Batch))
 }

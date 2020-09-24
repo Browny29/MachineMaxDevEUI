@@ -2,6 +2,7 @@ package domain_models
 
 import (
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
 )
 
@@ -10,10 +11,10 @@ func TestGenerateBatch(t *testing.T) {
 
 	euiSlice := generateBatch(amount)
 
-	assert.Len(t, euiSlice, amount)
-	assert.Len(t, euiSlice[0].ID, 16)
-	assert.Len(t, euiSlice[0].ShortCode, 5)
-	assert.Equal(t, euiSlice[0].ID[11:16], euiSlice[0].ShortCode)
+	assert.Len(t, euiSlice.Batch, amount)
+	assert.Len(t, euiSlice.Batch[0].ID, 16)
+	assert.Len(t, euiSlice.Batch[0].ShortCode, 5)
+	assert.Equal(t, euiSlice.Batch[0].ID[11:16], euiSlice.Batch[0].ShortCode)
 }
 
 func TestGenerateNew(t *testing.T) {
@@ -28,33 +29,35 @@ func TestGenerateBatchWithUniqueShortCodes(t *testing.T) {
 	for i := 0; i < 1000000; i++ {
 		devEUIs := GenerateBatchWithUniqueShortCodes(3)
 
-		assert.NotEqual(t, devEUIs[0].ShortCode, devEUIs[1].ShortCode)
-		assert.NotEqual(t, devEUIs[1].ShortCode, devEUIs[2].ShortCode)
-		assert.NotEqual(t, devEUIs[0].ShortCode, devEUIs[2].ShortCode)
+		assert.NotEqual(t, devEUIs.Batch[0].ShortCode, devEUIs.Batch[1].ShortCode)
+		assert.NotEqual(t, devEUIs.Batch[1].ShortCode, devEUIs.Batch[2].ShortCode)
+		assert.NotEqual(t, devEUIs.Batch[0].ShortCode, devEUIs.Batch[2].ShortCode)
 	}
 }
 
 func TestGenerateUniqueShortCode(t *testing.T) {
-	notUniqueDevEUIs := []DevEUI{
-		{
-			ID:        "1234567890123456",
-			ShortCode: "23456",
-		},
-		{
-			ID:        "1234567890123456",
-			ShortCode: "23456",
-		},
-		{
-			ID:        "1234567890123456",
-			ShortCode: "23456",
-		},
+	notUnique := &DevEUIBatch{
+		Batch: []*DevEUI{
+			{
+				ID:        "1234567890123456",
+				ShortCode: "23456",
+			},
+			{
+				ID:        "1234567890123456",
+				ShortCode: "23456",
+			},
+			{
+				ID:        "1234567890123456",
+				ShortCode: "23456",
+			}},
+		Lock: &sync.Mutex{},
 	}
 
-	notUniqueDevEUIs[0] = GenerateUniqueShortCode(0, notUniqueDevEUIs[0], notUniqueDevEUIs)
-	notUniqueDevEUIs[1] = GenerateUniqueShortCode(1, notUniqueDevEUIs[1], notUniqueDevEUIs)
-	notUniqueDevEUIs[2] = GenerateUniqueShortCode(2, notUniqueDevEUIs[2], notUniqueDevEUIs)
+	notUnique.Batch[0] = GenerateUniqueShortCode(0, notUnique.Batch[0], notUnique)
+	notUnique.Batch[1] = GenerateUniqueShortCode(1, notUnique.Batch[1], notUnique)
+	notUnique.Batch[2] = GenerateUniqueShortCode(2, notUnique.Batch[2], notUnique)
 
-	assert.NotEqual(t, notUniqueDevEUIs[0].ShortCode, notUniqueDevEUIs[1].ShortCode)
-	assert.NotEqual(t, notUniqueDevEUIs[1].ShortCode, notUniqueDevEUIs[2].ShortCode)
-	assert.NotEqual(t, notUniqueDevEUIs[0].ShortCode, notUniqueDevEUIs[2].ShortCode)
+	assert.NotEqual(t, notUnique.Batch[0].ShortCode, notUnique.Batch[1].ShortCode)
+	assert.NotEqual(t, notUnique.Batch[1].ShortCode, notUnique.Batch[2].ShortCode)
+	assert.NotEqual(t, notUnique.Batch[0].ShortCode, notUnique.Batch[2].ShortCode)
 }
