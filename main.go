@@ -22,6 +22,7 @@ func main() {
 	reader.ReadString('\n')
 }
 
+// setupCloseHandler makes sure the program can finish before closing it.
 func setupCloseHandler(processDone chan bool) {
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGINT)

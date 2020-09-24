@@ -1,6 +1,7 @@
 package deveui_service
 
 import (
+	"fmt"
 	"machine_max_deveui_generator/deveui_service/domain_models"
 	"machine_max_deveui_generator/lorawan_provider_client"
 	"machine_max_deveui_generator/lorawan_provider_client/client_models"
@@ -24,17 +25,23 @@ func NewDefaultService() *Service {
 }
 
 func (s *Service) RegisterBatch(amount int) (*domain_models.DevEUIBatch, error) {
+	// First we need to generate a batch each with a unique shortcode
 	devEUIs := domain_models.GenerateBatchWithUniqueShortCodes(amount)
-	wg := &sync.WaitGroup{}
-	maxRoutines := 10
-	routineStop := make(chan struct{}, maxRoutines)
 
+	wg := &sync.WaitGroup{}
+	maxRoutines := 10 // this number signifies the amount of go routines that are allowed to be running concurrently
+	routineStop := make(chan struct{}, maxRoutines) // the routineStop keeps track of the amount of go routines currently running
+
+	// Start registering the DevEUIs asynchronously
 	for i, devEUI := range devEUIs.Batch {
 		wg.Add(1)
-		routineStop <- struct{}{}
+		routineStop <- struct{}{} // signals a new go routine has started. This blocks if the maxRoutines number has been reached
+
+		// register a DevEUI asynchronously
 		go func(i int, devEUI *domain_models.DevEUI, devEUIs *domain_models.DevEUIBatch, wg *sync.WaitGroup) {
-			s.registerDevEUIRoutines(i, devEUI, devEUIs, wg)
-			<- routineStop
+			defer wg.Done()
+			s.registerDevEUI(i, devEUI, devEUIs, 0)
+			<- routineStop // signals the go routine has ended. If the max was reached a new routine can start now
 		}(i, devEUI, devEUIs, wg)
 	}
 
@@ -43,22 +50,26 @@ func (s *Service) RegisterBatch(amount int) (*domain_models.DevEUIBatch, error) 
 	return devEUIs, nil
 }
 
-func (s *Service) registerDevEUIRoutines(skipIndex int, inputEUI *domain_models.DevEUI, batch *domain_models.DevEUIBatch, wg *sync.WaitGroup) (*domain_models.DevEUI, error) {
-	defer wg.Done()
-	return s.registerDevEUI(skipIndex, inputEUI, batch)
-}
+func (s *Service) registerDevEUI(skipIndex int, inputEUI *domain_models.DevEUI, batch *domain_models.DevEUIBatch, numberOfTries int) {
+	var err error
+	numberOfTries++
 
-func (s *Service) registerDevEUI(skipIndex int, inputEUI *domain_models.DevEUI, batch *domain_models.DevEUIBatch) (*domain_models.DevEUI, error) {
-	outputEUI, err := s.Client.RegisterDevEUI(inputEUI)
-	if err == client_models.ErrDevEUIAlreadyExists {
+	if numberOfTries > 50 {
+		panic(fmt.Sprintf("#%d of the batch has been retried 50 times. Something is wrong", skipIndex))
+	}
+
+	// Register the DevEUI at the LoraWan provider
+	_, err = s.Client.RegisterDevEUI(inputEUI)
+	if err == client_models.ErrDevEUIAlreadyExists { // If we get a EUI already exists error, create a new DevEUI with a unique short code and try again
+		// Lock the batch so we are sure this new record will be unique
 		batch.Lock.Lock()
+		// Generate a new DevEUI with a unique short code
 		inputEUI = domain_models.GenerateUniqueShortCode(skipIndex, inputEUI, batch)
 		batch.Lock.Unlock()
-		return s.registerDevEUI(skipIndex, inputEUI, batch)
-	}
-	if err != nil {
-		return nil, err
-	}
 
-	return outputEUI, nil
+		// Try registering again
+		s.registerDevEUI(skipIndex, inputEUI, batch, numberOfTries)
+	} else if err != nil { // If we get a different error try again
+		s.registerDevEUI(skipIndex, inputEUI, batch, numberOfTries)
+	}
 }
