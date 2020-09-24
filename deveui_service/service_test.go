@@ -25,7 +25,7 @@ func TestService_RegisterBatch_Mocked(t *testing.T) {
 }
 
 func TestService_RegisterBatch(t *testing.T) {
-	const amount = 10
+	const amount = 100
 
 	s := NewDefaultService()
 

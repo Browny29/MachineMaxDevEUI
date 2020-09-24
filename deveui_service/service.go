@@ -25,11 +25,17 @@ func NewDefaultService() *Service {
 
 func (s *Service) RegisterBatch(amount int) (*domain_models.DevEUIBatch, error) {
 	devEUIs := domain_models.GenerateBatchWithUniqueShortCodes(amount)
-
 	wg := &sync.WaitGroup{}
+	maxRoutines := 10
+	routineStop := make(chan struct{}, maxRoutines)
+
 	for i, devEUI := range devEUIs.Batch {
 		wg.Add(1)
-		go s.registerDevEUIRoutines(i, devEUI, devEUIs, wg)
+		routineStop <- struct{}{}
+		go func(i int, devEUI *domain_models.DevEUI, devEUIs *domain_models.DevEUIBatch, wg *sync.WaitGroup) {
+			s.registerDevEUIRoutines(i, devEUI, devEUIs, wg)
+			<- routineStop
+		}(i, devEUI, devEUIs, wg)
 	}
 
 	wg.Wait()
@@ -45,6 +51,8 @@ func (s *Service) registerDevEUIRoutines(skipIndex int, inputEUI *domain_models.
 func (s *Service) registerDevEUI(skipIndex int, inputEUI *domain_models.DevEUI, batch *domain_models.DevEUIBatch) (*domain_models.DevEUI, error) {
 	outputEUI, err := s.Client.RegisterDevEUI(inputEUI)
 	if err == client_models.ErrDevEUIAlreadyExists {
+		batch.Lock.Lock()
+		defer batch.Lock.Unlock()
 		inputEUI = domain_models.GenerateUniqueShortCode(skipIndex, inputEUI, batch)
 		return s.registerDevEUI(skipIndex, inputEUI, batch)
 	}

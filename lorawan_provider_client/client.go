@@ -50,7 +50,7 @@ func (c *Client) doRequest(method string, path string, body interface{}) error{
 
 	req.Header.Set("Content-type", "application/json")
 
-	timeout := time.Duration(5 * time.Second)
+	timeout := time.Duration(100 * time.Second)
 	client := http.Client{
 		Timeout: timeout,
 	}
