@@ -3,6 +3,7 @@ package lorawan_provider_client
 import (
 	"github.com/stretchr/testify/assert"
 	"machine_max_deveui_generator/deveui_service/domain_models"
+	"machine_max_deveui_generator/lorawan_provider_client/client_models"
 	"testing"
 )
 
@@ -16,7 +17,7 @@ func TestClient_RegisterDevEUI(t *testing.T) {
 
 	deveui, err := c.RegisterDevEUI(input)
 	if err != nil {
-		assert.Equal(t, ErrDevEUIAlreadyExists, err)
+		assert.Equal(t, client_models.ErrDevEUIAlreadyExists, err)
 	} else {
 		assert.NoError(t, err)
 		assert.Equal(t, input.ID, deveui.ID)
