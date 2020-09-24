@@ -39,8 +39,7 @@ func (s *Service) RegisterBatch(amount int) (*domain_models.DevEUIBatch, error) 
 
 		// register a DevEUI asynchronously
 		go func(i int, devEUI *domain_models.DevEUI, devEUIs *domain_models.DevEUIBatch, wg *sync.WaitGroup) {
-			defer wg.Done()
-			s.registerDevEUI(i, devEUI, devEUIs, 0)
+			s.registerDevEUIRoutines(i, devEUI, devEUIs, wg)
 			<- routineStop // signals the go routine has ended. If the max was reached a new routine can start now
 		}(i, devEUI, devEUIs, wg)
 	}
@@ -50,11 +49,17 @@ func (s *Service) RegisterBatch(amount int) (*domain_models.DevEUIBatch, error) 
 	return devEUIs, nil
 }
 
+func (s *Service) registerDevEUIRoutines(skipIndex int, inputEUI *domain_models.DevEUI, batch *domain_models.DevEUIBatch, wg *sync.WaitGroup) (*domain_models.DevEUI, error) {
+	defer wg.Done()
+	s.registerDevEUI(skipIndex, inputEUI, batch, 0)
+	return nil, nil
+}
+
 func (s *Service) registerDevEUI(skipIndex int, inputEUI *domain_models.DevEUI, batch *domain_models.DevEUIBatch, numberOfTries int) {
 	var err error
 	numberOfTries++
 
-	if numberOfTries > 10 {
+	if numberOfTries > 50 {
 		panic(fmt.Sprintf("#%d of the batch has been retried 10 times. Something is wrong", skipIndex))
 	}
 
